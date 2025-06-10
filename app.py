@@ -687,4 +687,39 @@ if __name__ == '__main__' and os.getenv('ENV') != 'vercel':
 else:
     # Vercel 部署
     handler = app
+# ===== 必须添加这段用于Vercel部署 ====
+try:
+    from flask import Flask
+    from py2neo import Graph
+    import pandas as pd
+    from collections import Counter
+    from datetime import datetime
+    import re
+    from flask import request, jsonify, render_template, redirect, url_for, render_template_string
+    import jieba
+    from io import BytesIO
+    from wordcloud import WordCloud
+    from PIL import Image
+    import numpy as np
+    import matplotlib.pyplot as plt
+    import json
+    import base64
+    import os
+    import dashscope
+    from dashscope import ImageSynthesis
+except ImportError as e:
+    print(f"导入错误: {e}")
+    pass
+
+# 健康检查端点
+@app.route('/health')
+def health_check():
+    return jsonify({
+        "status": "healthy",
+        "server": "Vercel Python",
+        "python_version": "3.10"
+    })
+
+# Vercel 必需的handler
+handler = app
 
