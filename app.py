@@ -56,6 +56,14 @@ graph = Graph(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASSWORD))
 
 app.config['STATIC_FOLDER'] = os.path.abspath('web_app/static')
 
+@app.route('/<path:path>')
+def catch_all(path):
+    # 对于所有不匹配的路径，返回 index.html
+    return app.send_static_file('index.html') if path.startswith('static/') else render_template('index.html')
+
+@app.route('/')
+def home():
+    return render_template('index.html')
 
 @app.route('/generate_ink', methods=['POST'])
 def generate_ink_background():
