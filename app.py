@@ -680,10 +680,11 @@ def get_period_imagery(name):
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
-handler = app  # 必须添加这项
-
-if __name__ == '__main__':
+# 确保这是文件最后一行 ⬇️ 必须添加！
+if __name__ == '__main__' and os.getenv('ENV') != 'vercel':
+    # 本地运行
     app.run(debug=True)
-    # 在文件最后添加
+else:
+    # Vercel 部署
+    handler = app
 
-handler = app
