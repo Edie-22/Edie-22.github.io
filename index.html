@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>重定向中...</title>
+  <script>
+    // 跳转逻辑
+    const targetPage = "templates/index.html";
+    setTimeout(() => {
+      // 双保险跳转机制
+      window.location.href = targetPage;
+    }, 500);
+  </script>
+</head>
+<body style="background: #f5f5f5; font-family: Arial, sans-serif;">
+  <div style="text-align: center; margin-top: 100px;">
+    <h1>唐代诗人知识图谱</h1>
+    <p>网站正在加载，请稍候...</p>
+    <p>若页面未自动跳转，请点击：</p>
+    <a href="templates/index.html" style="color: #0366d6; font-weight: bold;">
+      进入唐代诗人可视化系统
+    </a>
+  </div>
+</body>
+</html>
