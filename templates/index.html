@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>唐代诗人知识图谱可视化系统</title>
+
+    <!-- 关键修改：定义API基础URL -->
+    <script>
+        // 自动设置API基础URL为当前部署地址
+        window.API_BASE_URL = window.location.origin;
+        console.info("API基础URL设置为：", API_BASE_URL);
+    </script>
+
+    <!-- 其他资源链接 -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+
+    <!-- 本地样式 -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+
+    <!-- 图表库 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.2.2/dist/echarts.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts-wordcloud@2.0.0/dist/echarts-wordcloud.min.js"></script>
+
+    <!-- 自定义样式 -->
+    <style>
+        .dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            padding: 20px;
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        #map {
+            height: 600px;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+            width: 100%;
+        }
+
+        .card {
+            background: transparent;
+            border-radius: 8px;
+            padding: 20px;
+            overflow: hidden;
+            background-color: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(5px);
+        }
+
+        #poet-image {
+            max-width: 200px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            border: 2px solid #e2d6c2;
+        }
+
+        #imagery-cloud {
+            height: 450px !important;
+            width: 100% !important;
+        }
+
+        .period-cloud {
+            height: 380px !important;
+            background-color: #f8f9fa;
+            border-radius: 8px;
+            border: 2px solid #e2d6c2;
+            margin: 10px;
+            transition: transform 0.3s;
+        }
+
+        .period-cloud:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        /* 新增连接状态指示器 */
+        .api-status {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            border-radius: 4px;
+            z-index: 9999;
+            font-size: 12px;
+        }
+        .api-status.connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .api-status.disconnected {
+            background-color: #F44336;
+            color: white;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+
+    <!-- 禁用favicon请求 -->
+    <link rel="icon" href="data:,">
+</head>
+
+<body>
+    <!-- API连接状态指示器 -->
+    <div id="apiStatus" class="api-status disconnected">
+        <i class="fas fa-plug"></i> API断开连接
+    </div>
+
+    <!-- Search Control -->
+    <div class="position-fixed top-0 end-0 m-3" style="z-index: 1000;">
+        <select id="poetSelect" class="form-select shadow">
+            <option value="">请选择诗人...</option>
+        </select>
+    </div>
+
+    <!-- Main Dashboard -->
+    <div class="dashboard">
+        <!-- 诗人简介 -->
+        <div class="card">
+            <h5><i class="fas fa-user-circle"></i> 诗人简介</h5>
+            <div class="d-flex">
+                <div class="bio-content flex-grow-1">
+                    <div id="poet-bio"></div>
+                </div>
+                <div class="image-wrapper">
+                    <img id="poet-image" src="" alt="诗人照片">
+                </div>
+            </div>
+        </div>
+
+        <!-- 代表作品 -->
+        <div class="representative-works">
+            <!-- 新增的左侧插画区 -->
+            <div class="illustration-container" id="generated-illustration">
+                <div class="loading-placeholder">
+                    <i class="fas fa-palette"></i>
+                    <span>等待图片生成...</span>
+                </div>
+            </div>
+            <div class="card poem-detail-card">
+                <div class="card-header">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="card-title"><i class="fas fa-book"></i> 代表作品</h5>
+                        <div class="search-box">
+                            <input type="text" id="poemSearch" class="form-control form-control-sm"
+                                   placeholder="请输入作品标题关键词.." style="width:200px">
+                            <button class="btn btn-sm btn-light ml-2"
+                                    id="searchBtn">
+                                <i class="fas fa-search"></i> 搜索
+                            </button>
+                            <div id="poemSuggestions" class="dropdown-menu" style="display: none;"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <!-- 默认作品区 -->
+                    <div id="poem-display" class="p-3">
+                        <div class="text-center text-muted py-3">
+                            <i class="fas fa-info-circle"></i> 请选择诗人以查看代表作品
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 地图 -->
+        <div class="card">
+            <h5><i class="fas fa-map-marked-alt"></i> 生平轨迹</h5>
+            <div id="map"></div>
+            <div id="timeline-container">
+                <button id="playButton" class="btn btn-primary">
+                    <i class="fas fa-play"></i> 播放
+                </button>
+                <button id="pauseButton" class="btn btn-secondary" disabled>
+                    <i class="fas fa-pause"></i> 暂停
+                </button>
+            </div>
+        </div>
+
+        <!-- 原时间序列折线图 -->
+        <div class="card">
+            <h5><i class="fas fa-chart-line"></i> 年度创作趋势</h5>
+            <div class="chart-container">
+                <canvas id="time-series-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 安史之乱时期分布 -->
+        <div class="card">
+            <h5><i class="fas fa-landmark"></i> 安史之乱时期对比</h5>
+            <div class="chart-container">
+                <canvas id="anshi-periods-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 政坛经历对比 -->
+        <div class="card">
+            <h5><i class="fas fa-university"></i> 仕途创作分布</h5>
+            <div class="chart-container">
+                <canvas id="political-status-chart"></canvas>
+            </div>
+        </div>
+
+        <!-- 意象分析系统 -->
+        <div class="card mt-4">
+            <h5 class="card-header d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-cloud"></i> 意象分析系统</span>
+                <ul class="nav nav-tabs card-header-tabs" id="imageryTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active"
+                                data-bs-toggle="tab"
+                                data-bs-target="#overallCloud"
+                                type="button">
+                            <i class="fas fa-globe-asia"></i> 整体分布
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link"
+                                data-bs-toggle="tab"
+                                data-bs-target="#preAnshiCloud"
+                                type="button">
+                            <i class="fas fa-history"></i> 安史之乱前
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link"
+                                data-bs-toggle="tab"
+                                data-bs-target="#postAnshiCloud"
+                                type="button">
+                            <i class="fas fa-forward"></i> 安史之乱后
+                        </button>
+                    </li>
+                </ul>
+            </h5>
+
+            <div class="card-body tab-content">
+                <!-- 整体词云 -->
+                <div class="tab-pane fade show active"
+                     id="overallCloud"
+                     role="tabpanel"
+                     style="height:500px"></div>
+
+                <!-- 安史之乱前 -->
+                <div class="tab-pane fade"
+                     id="preAnshiCloud"
+                     role="tabpanel"
+                     style="height:500px"></div>
+
+                <!-- 安史之乱后 -->
+                <div class="tab-pane fade"
+                     id="postAnshiCloud"
+                     role="tabpanel"
+                     style="height:500px"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- API连接检测脚本 -->
+    <script>
+        // API连接状态检测
+        function checkApiConnection() {
+            const apiStatus = document.getElementById('apiStatus');
+
+            fetch(API_BASE_URL + '/health')
+                .then(response => {
+                    if (response.ok) return response.json();
+                    throw new Error('API返回错误状态');
+                })
+                .then(data => {
+                    if (data.status === 'healthy') {
+                        apiStatus.className = 'api-status connected';
+                        apiStatus.innerHTML = '<i class="fas fa-check-circle"></i> API连接正常';
+                    } else {
+                        throw new Error('API返回异常状态');
+                    }
+                })
+                .catch(error => {
+                    apiStatus.className = 'api-status disconnected';
+                    apiStatus.innerHTML = `<i class="fas fa-exclamation-triangle"></i> API连接失败: ${error.message}`;
+                    console.error('API连接失败:', error);
+
+                    // 5秒后重试
+                    setTimeout(checkApiConnection, 5000);
+                });
+        }
+
+        // 页面加载后启动连接检测
+        document.addEventListener('DOMContentLoaded', checkApiConnection);
+    </script>
+
+    <!-- 引入 main.js -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+
+</html>
+
