@@ -2,25 +2,18 @@
   "version": 2,
   "builds": [
     {
-      "src": "app.py",
-      "use": "@vercel/python",
+      "src": "entrypoint.sh",
+      "use": "@vercel/build-utils@canary",
       "config": {
-        "maxLambdaSize": "25mb"
+        "distDir": "public",
+        "installCommand": ""
       }
     }
   ],
   "routes": [
     {
       "src": "/static/(.*)",
-      "dest": "/static/$1"
-    },
-    {
-      "src": "/api/poets/?(.*)",
-      "dest": "app.py"
-    },
-    {
-      "src": "/api/poet/?(.*)",
-      "dest": "app.py"
+      "dest": "static/$1"
     },
     {
       "src": "/api/(.*)",
@@ -28,7 +21,8 @@
     },
     {
       "src": "/(.*)",
-      "dest": "app.py"
+      "dest": "app.py",
+      "methods": ["GET", "POST", "PUT", "DELETE"]
     }
   ]
 }
